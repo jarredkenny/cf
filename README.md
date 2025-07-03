@@ -25,11 +25,13 @@ A convenient command-line tool for launching Claude Flow SPARC sessions with int
 ### Quick Setup
 
 1. Make the script executable:
+
    ```bash
    chmod +x cf
    ```
 
 2. Place it in your PATH:
+
    ```bash
    # Example: copy to a directory in your PATH
    cp cf ~/.local/bin/cf
@@ -82,6 +84,7 @@ cf --window auth --worktree auth "User authentication system"
 ### Configuration
 
 Create a configuration file at one of these locations:
+
 - `./.cf/config` (project-specific)
 - `~/.cf/config` (user-specific)
 - `~/.config/cf/config` (XDG config directory)
@@ -98,6 +101,7 @@ CF_BRANCH_PREFIX="feat/"            # Change branch prefix
 #### Editor Configuration
 
 The tool respects your editor preference in this order:
+
 1. `CF_EDITOR` from config file
 2. `$EDITOR` environment variable
 3. `vi` (fallback)
@@ -146,33 +150,40 @@ cf "Create comprehensive test suite for payment processing"
 ### Common Issues
 
 **"command not found: cf"**
+
 - Ensure the script is in your PATH
 - Check that it's executable: `chmod +x cf`
 
 **"❌ Missing required dependencies"**
+
 - Install the missing tools as indicated in the error message
 - For tmux: only required when using `--window` option
 
 **"❌ Error: Failed to open editor"**
+
 - Check that your editor is properly installed
 - Try setting a different editor: `export EDITOR=nano`
 
 **"❌ Not in a tmux session"**
+
 - Start tmux first: `tmux`
 - Or use without `--window` option
 
 **"❌ Not in a git repository"**
+
 - Initialize git: `git init`
 - Or use without `--worktree` option
 
 ### Configuration Issues
 
 **Config file not loading**
+
 - Check file permissions: `chmod 644 ~/.cf/config`
 - Verify bash syntax in config file
 - Check for typos in variable names
 
 **Editor not working**
+
 - For VS Code: use `CF_EDITOR="code --wait"`
 - For GUI editors: ensure they support command-line usage
 
@@ -228,18 +239,3 @@ This tool is designed to be simple and focused. When contributing:
 ## License
 
 MIT License - Feel free to use and modify as needed.
-
-## Known Limitations
-
-- **Platform Support**: Primarily tested on macOS/Linux
-- **Claude Flow Dependency**: Requires claude-flow to be installed
-- **Tmux Requirement**: Window mode requires active tmux session
-- **Git Requirement**: Worktree mode requires git repository
-
-## Future Enhancements
-
-- Windows/PowerShell support
-- Integration with more task management tools
-- Project templates and presets
-- Session history and replay
-- Multi-project workspace support
