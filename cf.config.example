@@ -1,0 +1,38 @@
+# Example cf configuration file
+# Copy this to ~/.cf/config, ./.cf/config, or ~/.config/cf/config
+
+# Editor configuration
+# Use your preferred editor for writing prompts
+CF_EDITOR="vi"              # Default fallback editor
+# CF_EDITOR="nano"          # User-friendly editor
+# CF_EDITOR="code --wait"   # VS Code (waits for file to be closed)
+# CF_EDITOR="vim"           # Vim
+# CF_EDITOR="emacs"         # Emacs
+
+# Worktree configuration
+# Directory where git worktrees are created
+CF_WORKTREE_DIR="./worktrees"     # Default: ./worktrees/
+# CF_WORKTREE_DIR="./workspace"   # Alternative: ./workspace/
+# CF_WORKTREE_DIR="../features"   # Alternative: ../features/
+
+# Branch naming configuration
+# Prefix for feature branches created with --worktree
+CF_BRANCH_PREFIX="feature/"       # Default: feature/branch-name
+# CF_BRANCH_PREFIX="feat/"        # Alternative: feat/branch-name  
+# CF_BRANCH_PREFIX="task/"        # Alternative: task/branch-name
+# CF_BRANCH_PREFIX=""             # Alternative: branch-name (no prefix)
+
+# Examples of complete configurations:
+
+# Minimal configuration
+# CF_EDITOR="nano"
+
+# Developer configuration
+# CF_EDITOR="code --wait"
+# CF_WORKTREE_DIR="./dev"
+# CF_BRANCH_PREFIX="dev/"
+
+# Team configuration
+# CF_EDITOR="vim"
+# CF_WORKTREE_DIR="./features"
+# CF_BRANCH_PREFIX="feature/"

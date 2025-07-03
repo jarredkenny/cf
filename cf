@@ -1,0 +1,371 @@
+#!/bin/bash
+
+set -e
+
+# Dependency check function
+check_dependencies() {
+    local missing_deps=()
+    
+    # Check for git
+    if ! command -v git &> /dev/null; then
+        missing_deps+=("git")
+    fi
+    
+    # Check for tmux (only if --window is used)
+    if [[ -n "$WINDOW_NAME" ]] && ! command -v tmux &> /dev/null; then
+        missing_deps+=("tmux")
+    fi
+    
+    # Check for npm/npx (for claude-flow installation)
+    if ! command -v npm &> /dev/null && ! command -v npx &> /dev/null; then
+        missing_deps+=("npm/npx")
+    fi
+    
+    if [[ ${#missing_deps[@]} -gt 0 ]]; then
+        echo "❌ Missing required dependencies:"
+        for dep in "${missing_deps[@]}"; do
+            case $dep in
+                "git")
+                    echo "  📦 git - Install with: brew install git (macOS) or apt-get install git (Ubuntu)"
+                    ;;
+                "tmux")
+                    echo "  📦 tmux - Install with: brew install tmux (macOS) or apt-get install tmux (Ubuntu)"
+                    echo "     Note: tmux is only required when using --window option"
+                    ;;
+                "npm/npx")
+                    echo "  📦 npm/npx - Install Node.js from https://nodejs.org or use a package manager"
+                    ;;
+            esac
+        done
+        echo ""
+        echo "💡 Install missing dependencies and try again"
+        exit 1
+    fi
+}
+
+# Load configuration
+load_config() {
+    # Set defaults
+    CF_EDITOR="${EDITOR:-vi}"
+    CF_WORKTREE_DIR="./worktrees"
+    CF_BRANCH_PREFIX="feature/"
+    
+    # Check for config file in order of preference
+    local config_files=(
+        "./.cf/config"
+        "$HOME/.cf/config"
+        "$HOME/.config/cf/config"
+    )
+    
+    for config_file in "${config_files[@]}"; do
+        if [[ -f "$config_file" ]]; then
+            # Source the config file safely
+            if source "$config_file" 2>/dev/null; then
+                echo "📄 Using config: $config_file"
+                break
+            else
+                echo "⚠️  Warning: Failed to load config file: $config_file"
+            fi
+        fi
+    done
+}
+
+# Show help function
+show_help() {
+    echo "Usage: cf [OPTIONS] [PROMPT]"
+    echo ""
+    echo "Start a Claude Flow SPARC session."
+    echo ""
+    echo "Options:"
+    echo "  --window NAME        Run in a new tmux window with given name"
+    echo "  --worktree NAME      Create git worktree with branch feature/NAME"
+    echo "  --help, -h           Show this help message"
+    echo ""
+    echo "Configuration:"
+    echo "  Create a config file at ./.cf/config, ~/.cf/config, or ~/.config/cf/config"
+    echo "  Available settings:"
+    echo "    CF_EDITOR=\"vim\"           # Override default editor"
+    echo "    CF_WORKTREE_DIR=\"./work\"   # Change worktree location"
+    echo "    CF_BRANCH_PREFIX=\"feat/\"   # Change branch prefix"
+    echo ""
+    echo "Examples:"
+    echo "  cf                           # Run interactively in current terminal"
+    echo "  cf \"Build a REST API\"        # Run with prompt in current terminal"
+    echo "  cf --window auth             # Run in new tmux window: cf-auth"
+    echo "  cf --worktree login          # Create worktree and run in current terminal"
+    echo "  cf --window api --worktree api  # Both worktree and tmux window"
+}
+
+# Parse arguments
+WORKTREE_NAME=""
+WINDOW_NAME=""
+DIRECT_PROMPT=""
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --worktree)
+            WORKTREE_NAME="$2"
+            shift 2
+            ;;
+        --window)
+            WINDOW_NAME="$2"
+            shift 2
+            ;;
+        --help|-h)
+            show_help
+            exit 0
+            ;;
+        -*)
+            echo "Unknown option: $1"
+            show_help
+            exit 1
+            ;;
+        *)
+            # Capture remaining arguments as the prompt
+            DIRECT_PROMPT="$*"
+            break
+            ;;
+    esac
+done
+
+# Load configuration
+load_config
+
+# Check dependencies
+check_dependencies
+
+# Check if we're in tmux (only required when using --window)
+if [[ -n "$WINDOW_NAME" ]] && [[ -z "$TMUX" ]]; then
+    echo "❌ Error: Not in a tmux session"
+    echo "💡 Please start tmux first with: tmux"
+    exit 1
+fi
+
+# Generate window name if using tmux
+if [[ -n "$WINDOW_NAME" ]]; then
+    TMUX_WINDOW_NAME="cf-$WINDOW_NAME"
+else
+    TMUX_WINDOW_NAME=""
+fi
+
+# Set branch name for worktree if needed
+if [[ -n "$WORKTREE_NAME" ]]; then
+    BRANCH_NAME="${CF_BRANCH_PREFIX}$WORKTREE_NAME"
+fi
+
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+ROOT_DIR=$(pwd)
+# Look for claude-flow in the current directory first, then in PATH
+if [[ -x "./claude-flow" ]]; then
+    CLAUDE_FLOW_PATH="./claude-flow"
+else
+    CLAUDE_FLOW_PATH="claude-flow"
+fi
+
+# Check if we're in a git repository (only required for worktree)
+if [[ -n "$WORKTREE_NAME" ]] && ! git rev-parse --git-dir > /dev/null 2>&1; then
+    echo "❌ Error: Not in a git repository (required for --worktree option)"
+    exit 1
+fi
+
+# Check if claude-flow project is initialized
+if [[ ! -d "./.claude" ]] && [[ ! -f "./claude-flow" ]]; then
+    # Check if claude-flow exists in PATH
+    if ! command -v claude-flow &> /dev/null; then
+        echo "⚠️  claude-flow not found"
+        echo "📦 Initializing claude-flow project with SPARC mode..."
+        npx claude-flow@latest init --sparc
+        echo "✅ claude-flow project initialized successfully"
+    else
+        # claude-flow is in PATH but project not initialized
+        echo "📦 Initializing claude-flow project with SPARC mode..."
+        claude-flow init --sparc
+        echo "✅ claude-flow project initialized successfully"
+    fi
+fi
+
+# Verify claude-flow is available
+if [[ ! -x "./claude-flow" ]] && ! command -v claude-flow &> /dev/null; then
+    echo "❌ Error: claude-flow not available"
+    echo "💡 Please install claude-flow globally with: npm install -g claude-flow"
+    echo "   Or run: npx claude-flow@latest init --sparc"
+    exit 1
+fi
+
+# Create git worktree and branch if requested
+if [[ -n "$WORKTREE_NAME" ]]; then
+    WORKTREE_DIR_NAME="${WORKTREE_NAME}"
+    WORKTREE_PATH="$ROOT_DIR/$CF_WORKTREE_DIR/$WORKTREE_DIR_NAME"
+    
+    # Check if worktree already exists
+    if [[ -d "$WORKTREE_PATH" ]]; then
+        echo "🌿 Using existing worktree: $WORKTREE_PATH"
+        echo "📍 Branch: $BRANCH_NAME"
+    else
+        # Check if branch already exists
+        if git show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
+            echo "🌿 Branch $BRANCH_NAME already exists, creating worktree..."
+            mkdir -p "$CF_WORKTREE_DIR"
+            if ! git worktree add "$WORKTREE_PATH" "$BRANCH_NAME"; then
+                echo "❌ Error: Failed to create worktree"
+                echo "💡 Check if the worktree path already exists or if there are git conflicts"
+                exit 1
+            fi
+        else
+            echo "🌿 Creating new git worktree and branch: $BRANCH_NAME"
+            mkdir -p "$CF_WORKTREE_DIR"
+            if ! git worktree add "$WORKTREE_PATH" -b "$BRANCH_NAME"; then
+                echo "❌ Error: Failed to create worktree and branch"
+                echo "💡 Check if the branch name is valid and worktree path is available"
+                exit 1
+            fi
+        fi
+    fi
+else
+    WORKTREE_PATH="$ROOT_DIR"
+fi
+
+# Change to worktree directory if created
+if [[ -n "$WORKTREE_NAME" ]]; then
+    cd "$WORKTREE_PATH"
+    echo "📍 Working directory: $WORKTREE_PATH"
+fi
+
+# Run in tmux window mode or direct mode
+if [[ -n "$WINDOW_NAME" ]]; then
+    # TMUX WINDOW MODE
+    PROMPT_FILE="/tmp/claude-prompt-$TMUX_WINDOW_NAME.txt"
+    
+    # Create initial prompt file with helpful template
+    cat > "$PROMPT_FILE" << 'EOF'
+# Write your prompt for Claude Flow SPARC below
+# This will be executed with: ./claude-flow sparc "<your prompt>"
+# 
+# Examples:
+# - "Create a new React component for user authentication"
+# - "Analyze the current codebase for performance bottlenecks"
+# - "Implement a REST API endpoint for user management"
+# 
+# Your prompt:
+
+EOF
+
+    # Create startup script that will run in the new tmux window
+    STARTUP_SCRIPT="/tmp/cf-startup-$TMUX_WINDOW_NAME.sh"
+    cat > "$STARTUP_SCRIPT" << EOF
+#!/bin/bash
+cd "$WORKTREE_PATH"
+
+echo "📍 Working directory: $WORKTREE_PATH"
+echo "✏️ Opening editor to write your prompt..."
+echo "💡 When you save and exit, your prompt will be sent to claude-flow sparc"
+echo ""
+
+# Open editor for prompt editing
+if ! $CF_EDITOR "$PROMPT_FILE"; then
+    echo "❌ Error: Failed to open editor ($CF_EDITOR)"
+    echo "💡 Try setting a different editor in config or export EDITOR=nano"
+    rm -f "$PROMPT_FILE" "$STARTUP_SCRIPT"
+    exit 1
+fi
+
+# Read the prompt from file, skip template comments
+# Use more portable sed syntax
+PROMPT=\$(grep -v '^#' "$PROMPT_FILE" | sed '/^\$/d' | tr '\\n' ' ' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' 2>/dev/null || true)
+
+if [[ -z "\$PROMPT" ]]; then
+    echo "❌ No prompt provided. Exiting..."
+    rm -f "$PROMPT_FILE" "$STARTUP_SCRIPT"
+    exit 1
+fi
+
+echo "🎯 Executing prompt with Claude Flow SPARC..."
+echo "Prompt: \$PROMPT"
+echo ""
+
+# Execute claude-flow sparc
+if [[ -x "./claude-flow" ]]; then
+    ./claude-flow sparc "\$PROMPT"
+else
+    claude-flow sparc "\$PROMPT"
+fi
+
+# Cleanup
+rm -f "$PROMPT_FILE" "$STARTUP_SCRIPT"
+EOF
+
+    chmod +x "$STARTUP_SCRIPT"
+
+    # Create and switch to new tmux window
+    echo "📺 Creating and switching to new tmux window: $TMUX_WINDOW_NAME"
+    if ! tmux new-window -n "$TMUX_WINDOW_NAME" "bash $STARTUP_SCRIPT"; then
+        echo "❌ Error: Failed to create tmux window"
+        echo "💡 Check if tmux is running properly"
+        rm -f "$PROMPT_FILE" "$STARTUP_SCRIPT"
+        exit 1
+    fi
+else
+    # DIRECT MODE - Run in current terminal
+    if [[ -n "$DIRECT_PROMPT" ]]; then
+        # Run with provided prompt
+        echo "🎯 Executing Claude Flow SPARC with prompt: $DIRECT_PROMPT"
+        if [[ -x "./claude-flow" ]]; then
+            ./claude-flow sparc "$DIRECT_PROMPT"
+        else
+            claude-flow sparc "$DIRECT_PROMPT"
+        fi
+    else
+        # Interactive mode - open editor for prompt
+        PROMPT_FILE="/tmp/claude-prompt-$$.txt"
+        
+        # Create prompt template
+        cat > "$PROMPT_FILE" << 'EOF'
+# Write your prompt for Claude Flow SPARC below
+# This will be executed with: ./claude-flow sparc "<your prompt>"
+# 
+# Examples:
+# - "Create a new React component for user authentication"
+# - "Analyze the current codebase for performance bottlenecks"
+# - "Implement a REST API endpoint for user management"
+# 
+# Your prompt:
+
+EOF
+        
+        echo "✏️ Opening editor to write your prompt..."
+        echo "💡 When you save and exit, your prompt will be sent to claude-flow sparc"
+        echo ""
+        
+        # Open editor for prompt editing
+        if ! $CF_EDITOR "$PROMPT_FILE"; then
+            echo "❌ Error: Failed to open editor ($CF_EDITOR)"
+            echo "💡 Try setting a different editor: export EDITOR=nano"
+            rm -f "$PROMPT_FILE"
+            exit 1
+        fi
+        
+        # Read the prompt from file, skip template comments
+        # Use more portable sed syntax
+        PROMPT=$(grep -v '^#' "$PROMPT_FILE" | sed '/^$/d' | tr '\n' ' ' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' 2>/dev/null || true)
+        
+        if [[ -z "$PROMPT" ]]; then
+            echo "❌ No prompt provided. Exiting..."
+            rm -f "$PROMPT_FILE"
+            exit 1
+        fi
+        
+        echo "🎯 Executing prompt with Claude Flow SPARC..."
+        echo "Prompt: $PROMPT"
+        echo ""
+        
+        # Execute claude-flow sparc
+        if [[ -x "./claude-flow" ]]; then
+            ./claude-flow sparc "$PROMPT"
+        else
+            claude-flow sparc "$PROMPT"
+        fi
+        
+        # Cleanup
+        rm -f "$PROMPT_FILE"
+    fi
+fi
