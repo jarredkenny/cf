@@ -49,6 +49,8 @@ load_config() {
     CF_EDITOR="${EDITOR:-vi}"
     CF_WORKTREE_DIR="./worktrees"
     CF_BRANCH_PREFIX="feature/"
+    CF_ENABLE_TMUX="false"
+    CF_ENABLE_WORKTREE="false"
     
     # Check for config file in order of preference
     local config_files=(
@@ -72,13 +74,17 @@ load_config() {
 
 # Show help function
 show_help() {
-    echo "Usage: cf [OPTIONS] [PROMPT]"
+    echo "Usage: cf [OPTIONS] [NAME]"
     echo ""
     echo "Start a Claude Flow SPARC session."
+    echo ""
+    echo "Arguments:"
+    echo "  NAME                 Name for tmux window and/or worktree (when enabled in config)"
     echo ""
     echo "Options:"
     echo "  --window NAME        Run in a new tmux window with given name"
     echo "  --worktree NAME      Create git worktree with branch feature/NAME"
+    echo "  --prompt TEXT        Provide prompt directly for non-interactive mode"
     echo "  --help, -h           Show this help message"
     echo ""
     echo "Configuration:"
@@ -87,10 +93,13 @@ show_help() {
     echo "    CF_EDITOR=\"vim\"           # Override default editor"
     echo "    CF_WORKTREE_DIR=\"./work\"   # Change worktree location"
     echo "    CF_BRANCH_PREFIX=\"feat/\"   # Change branch prefix"
+    echo "    CF_ENABLE_TMUX=\"true\"      # Enable tmux integration by default"
+    echo "    CF_ENABLE_WORKTREE=\"true\"  # Enable worktree integration by default"
     echo ""
     echo "Examples:"
     echo "  cf                           # Run interactively in current terminal"
-    echo "  cf \"Build a REST API\"        # Run with prompt in current terminal"
+    echo "  cf auth                      # Run with NAME 'auth' (uses config defaults)"
+    echo "  cf auth --prompt \"Build auth\" # Run with NAME 'auth' and direct prompt"
     echo "  cf --window auth             # Run in new tmux window: cf-auth"
     echo "  cf --worktree login          # Create worktree and run in current terminal"
     echo "  cf --window api --worktree api  # Both worktree and tmux window"
@@ -100,6 +109,7 @@ show_help() {
 WORKTREE_NAME=""
 WINDOW_NAME=""
 DIRECT_PROMPT=""
+NAME=""
 while [[ $# -gt 0 ]]; do
     case $1 in
         --worktree)
@@ -108,6 +118,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --window)
             WINDOW_NAME="$2"
+            shift 2
+            ;;
+        --prompt)
+            DIRECT_PROMPT="$2"
             shift 2
             ;;
         --help|-h)
@@ -120,15 +134,26 @@ while [[ $# -gt 0 ]]; do
             exit 1
             ;;
         *)
-            # Capture remaining arguments as the prompt
-            DIRECT_PROMPT="$*"
-            break
+            # First non-option argument is the NAME
+            NAME="$1"
+            shift
             ;;
     esac
 done
 
 # Load configuration
 load_config
+
+# Apply config defaults and NAME parameter
+if [[ -n "$NAME" ]]; then
+    # If NAME is provided, use it for both tmux and worktree if config enables them
+    if [[ "$CF_ENABLE_TMUX" == "true" ]] && [[ -z "$WINDOW_NAME" ]]; then
+        WINDOW_NAME="$NAME"
+    fi
+    if [[ "$CF_ENABLE_WORKTREE" == "true" ]] && [[ -z "$WORKTREE_NAME" ]]; then
+        WORKTREE_NAME="$NAME"
+    fi
+fi
 
 # Check dependencies
 check_dependencies
@@ -142,7 +167,9 @@ fi
 
 # Generate window name if using tmux
 if [[ -n "$WINDOW_NAME" ]]; then
-    TMUX_WINDOW_NAME="cf-$WINDOW_NAME"
+    # Replace spaces with hyphens for tmux compatibility
+    SANITIZED_WINDOW_NAME=$(echo "$WINDOW_NAME" | tr ' ' '-')
+    TMUX_WINDOW_NAME="cf-$SANITIZED_WINDOW_NAME"
 else
     TMUX_WINDOW_NAME=""
 fi

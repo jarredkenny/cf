@@ -22,6 +22,15 @@ CF_BRANCH_PREFIX="feature/"       # Default: feature/branch-name
 # CF_BRANCH_PREFIX="task/"        # Alternative: task/branch-name
 # CF_BRANCH_PREFIX=""             # Alternative: branch-name (no prefix)
 
+# Integration defaults
+# Enable tmux window integration by default
+CF_ENABLE_TMUX="false"            # Default: false (disabled)
+# CF_ENABLE_TMUX="true"           # Alternative: true (enabled)
+
+# Enable git worktree integration by default
+CF_ENABLE_WORKTREE="false"        # Default: false (disabled)
+# CF_ENABLE_WORKTREE="true"       # Alternative: true (enabled)
+
 # Examples of complete configurations:
 
 # Minimal configuration
@@ -36,3 +45,10 @@ CF_BRANCH_PREFIX="feature/"       # Default: feature/branch-name
 # CF_EDITOR="vim"
 # CF_WORKTREE_DIR="./features"
 # CF_BRANCH_PREFIX="feature/"
+
+# Full integration setup (tmux + worktree enabled)
+# CF_EDITOR="code --wait"
+# CF_WORKTREE_DIR="./features"
+# CF_BRANCH_PREFIX="feature/"
+# CF_ENABLE_TMUX="true"
+# CF_ENABLE_WORKTREE="true"
