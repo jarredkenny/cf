@@ -51,6 +51,7 @@ load_config() {
     CF_BRANCH_PREFIX="feature/"
     CF_ENABLE_TMUX="false"
     CF_ENABLE_WORKTREE="false"
+    CF_BASE_BRANCH=""
     
     # Check for config file in order of preference
     local config_files=(
@@ -95,6 +96,7 @@ show_help() {
     echo "    CF_BRANCH_PREFIX=\"feat/\"   # Change branch prefix"
     echo "    CF_ENABLE_TMUX=\"true\"      # Enable tmux integration by default"
     echo "    CF_ENABLE_WORKTREE=\"true\"  # Enable worktree integration by default"
+    echo "    CF_BASE_BRANCH=\"main\"      # Base branch for new worktrees (default: current HEAD)"
     echo ""
     echo "Examples:"
     echo "  cf                           # Run interactively in current terminal"
@@ -240,11 +242,22 @@ if [[ -n "$WORKTREE_NAME" ]]; then
             fi
         else
             echo "🌿 Creating new git worktree and branch: $BRANCH_NAME"
+            if [[ -n "$CF_BASE_BRANCH" ]]; then
+                echo "🌱 Using base branch: $CF_BASE_BRANCH"
+            fi
             mkdir -p "$CF_WORKTREE_DIR"
-            if ! git worktree add "$WORKTREE_PATH" -b "$BRANCH_NAME"; then
-                echo "❌ Error: Failed to create worktree and branch"
-                echo "💡 Check if the branch name is valid and worktree path is available"
-                exit 1
+            if [[ -n "$CF_BASE_BRANCH" ]]; then
+                if ! git worktree add "$WORKTREE_PATH" -b "$BRANCH_NAME" "$CF_BASE_BRANCH"; then
+                    echo "❌ Error: Failed to create worktree and branch"
+                    echo "💡 Check if the branch name is valid, base branch exists, and worktree path is available"
+                    exit 1
+                fi
+            else
+                if ! git worktree add "$WORKTREE_PATH" -b "$BRANCH_NAME"; then
+                    echo "❌ Error: Failed to create worktree and branch"
+                    echo "💡 Check if the branch name is valid and worktree path is available"
+                    exit 1
+                fi
             fi
         fi
     fi
