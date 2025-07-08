@@ -107,6 +107,7 @@ CF_WORKTREE_DIR="./workspace"       # Change worktree location
 CF_BRANCH_PREFIX="feat/"            # Change branch prefix
 CF_ENABLE_TMUX="true"               # Enable tmux integration by default
 CF_ENABLE_WORKTREE="true"           # Enable worktree integration by default
+CF_BASE_BRANCH="main"               # Base branch for new worktrees (default: current HEAD)
 ```
 
 #### Editor Configuration
@@ -221,6 +222,11 @@ echo 'CF_BRANCH_PREFIX="task/"' > .cf/config
 echo 'CF_ENABLE_WORKTREE="true"' >> .cf/config
 cf 123 --prompt "Implement task #123"
 # Creates: task/123 branch
+
+# Specify base branch for new worktrees
+echo 'CF_BASE_BRANCH="develop"' >> .cf/config
+cf feature-x --prompt "New feature"
+# Creates: feature/feature-x branch from develop
 ```
 
 ### Integration with Other Tools
@@ -242,6 +248,7 @@ CF_ENABLE_TMUX="true"
 CF_ENABLE_WORKTREE="true"
 CF_EDITOR="code --wait"
 CF_WORKTREE_DIR="./features"
+CF_BASE_BRANCH="main"
 ```
 
 With this configuration:

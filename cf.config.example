@@ -31,6 +31,12 @@ CF_ENABLE_TMUX="false"            # Default: false (disabled)
 CF_ENABLE_WORKTREE="false"        # Default: false (disabled)
 # CF_ENABLE_WORKTREE="true"       # Alternative: true (enabled)
 
+# Base branch for new worktrees
+# When creating new worktrees, branch from this base branch instead of current HEAD
+CF_BASE_BRANCH=""                 # Default: "" (use current HEAD)
+# CF_BASE_BRANCH="main"           # Alternative: use main branch as base
+# CF_BASE_BRANCH="develop"        # Alternative: use develop branch as base
+
 # Examples of complete configurations:
 
 # Minimal configuration
@@ -52,3 +58,4 @@ CF_ENABLE_WORKTREE="false"        # Default: false (disabled)
 # CF_BRANCH_PREFIX="feature/"
 # CF_ENABLE_TMUX="true"
 # CF_ENABLE_WORKTREE="true"
+# CF_BASE_BRANCH="main"
