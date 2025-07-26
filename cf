@@ -77,7 +77,7 @@ load_config() {
 show_help() {
     echo "Usage: cf [OPTIONS] [NAME]"
     echo ""
-    echo "Start a Claude Flow SPARC session."
+    echo "Start a Claude Flow session."
     echo ""
     echo "Arguments:"
     echo "  NAME                 Name for tmux window and/or worktree (when enabled in config)"
@@ -202,13 +202,13 @@ if [[ ! -d "./.claude" ]] && [[ ! -f "./claude-flow" ]]; then
     # Check if claude-flow exists in PATH
     if ! command -v claude-flow &> /dev/null; then
         echo "⚠️  claude-flow not found"
-        echo "📦 Initializing claude-flow project with SPARC mode..."
-        npx claude-flow@latest init --sparc
+        echo "📦 Initializing claude-flow project..."
+        npx claude-flow@lalpha init --force
         echo "✅ claude-flow project initialized successfully"
     else
         # claude-flow is in PATH but project not initialized
-        echo "📦 Initializing claude-flow project with SPARC mode..."
-        claude-flow init --sparc
+        echo "📦 Initializing claude-flow project..."
+        claude-flow init --force
         echo "✅ claude-flow project initialized successfully"
     fi
 fi
@@ -217,7 +217,7 @@ fi
 if [[ ! -x "./claude-flow" ]] && ! command -v claude-flow &> /dev/null; then
     echo "❌ Error: claude-flow not available"
     echo "💡 Please install claude-flow globally with: npm install -g claude-flow"
-    echo "   Or run: npx claude-flow@latest init --sparc"
+    echo "   Or run: npx claude-flow@alpha init --force"
     exit 1
 fi
 
@@ -278,8 +278,8 @@ if [[ -n "$WINDOW_NAME" ]]; then
     
     # Create initial prompt file with helpful template
     cat > "$PROMPT_FILE" << 'EOF'
-# Write your prompt for Claude Flow SPARC below
-# This will be executed with: ./claude-flow sparc "<your prompt>"
+# Write your prompt for Claude Flow 
+# This will be executed with: ./claude-flow swarm "<your prompt>"
 # 
 # Examples:
 # - "Create a new React component for user authentication"
@@ -298,7 +298,7 @@ cd "$WORKTREE_PATH"
 
 echo "📍 Working directory: $WORKTREE_PATH"
 echo "✏️ Opening editor to write your prompt..."
-echo "💡 When you save and exit, your prompt will be sent to claude-flow sparc"
+echo "💡 When you save and exit, your prompt will be sent to claude-flow swarm"
 echo ""
 
 # Open editor for prompt editing
@@ -319,15 +319,15 @@ if [[ -z "\$PROMPT" ]]; then
     exit 1
 fi
 
-echo "🎯 Executing prompt with Claude Flow SPARC..."
+echo "🎯 Executing prompt with Claude Flow swarm..."
 echo "Prompt: \$PROMPT"
 echo ""
 
-# Execute claude-flow sparc
+# Execute claude-flow swarm
 if [[ -x "./claude-flow" ]]; then
-    ./claude-flow sparc "\$PROMPT"
+    ./claude-flow swarm "\$PROMPT"
 else
-    claude-flow sparc "\$PROMPT"
+    claude-flow swarm "\$PROMPT"
 fi
 
 # Cleanup
@@ -354,11 +354,11 @@ else
     # DIRECT MODE - Run in current terminal
     if [[ -n "$DIRECT_PROMPT" ]]; then
         # Run with provided prompt
-        echo "🎯 Executing Claude Flow SPARC with prompt: $DIRECT_PROMPT"
+        echo "🎯 Executing Claude Flow swarm with prompt: $DIRECT_PROMPT"
         if [[ -x "./claude-flow" ]]; then
-            ./claude-flow sparc "$DIRECT_PROMPT"
+            ./claude-flow swarm "$DIRECT_PROMPT"
         else
-            claude-flow sparc "$DIRECT_PROMPT"
+            claude-flow swarm "$DIRECT_PROMPT"
         fi
         
         # Keep user in the worktree directory with a shell
@@ -374,8 +374,8 @@ else
         
         # Create prompt template
         cat > "$PROMPT_FILE" << 'EOF'
-# Write your prompt for Claude Flow SPARC below
-# This will be executed with: ./claude-flow sparc "<your prompt>"
+# Write your prompt for Claude Flow below
+# This will be executed with: ./claude-flow swarm "<your prompt>"
 # 
 # Examples:
 # - "Create a new React component for user authentication"
@@ -387,7 +387,7 @@ else
 EOF
         
         echo "✏️ Opening editor to write your prompt..."
-        echo "💡 When you save and exit, your prompt will be sent to claude-flow sparc"
+        echo "💡 When you save and exit, your prompt will be sent to claude-flow swarm"
         echo ""
         
         # Open editor for prompt editing
@@ -408,15 +408,15 @@ EOF
             exit 1
         fi
         
-        echo "🎯 Executing prompt with Claude Flow SPARC..."
+        echo "🎯 Executing prompt with Claude Flow swarm..."
         echo "Prompt: $PROMPT"
         echo ""
         
-        # Execute claude-flow sparc
+        # Execute claude-flow swarm
         if [[ -x "./claude-flow" ]]; then
-            ./claude-flow sparc "$PROMPT"
+            ./claude-flow swarm "$PROMPT"
         else
-            claude-flow sparc "$PROMPT"
+            claude-flow swarm "$PROMPT"
         fi
         
         # Cleanup
