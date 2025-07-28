@@ -37,6 +37,14 @@ CF_BASE_BRANCH=""                 # Default: "" (use current HEAD)
 # CF_BASE_BRANCH="main"           # Alternative: use main branch as base
 # CF_BASE_BRANCH="develop"        # Alternative: use develop branch as base
 
+# Base branch configuration examples:
+# CF_BASE_BRANCH="main"           # Always use main branch as base
+# CF_BASE_BRANCH="develop"        # Use develop branch for feature branches
+# CF_BASE_BRANCH="release/v2"     # Use specific release branch
+# 
+# Note: Do not include 'origin/' prefix - use local branch names
+# The tool will automatically fetch and update from the remote tracking branch
+
 # Examples of complete configurations:
 
 # Minimal configuration

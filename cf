@@ -85,6 +85,7 @@ show_help() {
     echo "Options:"
     echo "  --window NAME        Run in a new tmux window with given name"
     echo "  --worktree NAME      Create git worktree with branch feature/NAME"
+    echo "  --base-branch NAME   Override base branch for worktree creation"
     echo "  --prompt TEXT        Provide prompt directly for non-interactive mode"
     echo "  --help, -h           Show this help message"
     echo ""
@@ -112,6 +113,7 @@ WORKTREE_NAME=""
 WINDOW_NAME=""
 DIRECT_PROMPT=""
 NAME=""
+BASE_BRANCH_OVERRIDE=""
 while [[ $# -gt 0 ]]; do
     case $1 in
         --worktree)
@@ -124,6 +126,15 @@ while [[ $# -gt 0 ]]; do
             ;;
         --prompt)
             DIRECT_PROMPT="$2"
+            shift 2
+            ;;
+        --base-branch)
+            if [[ -z "$2" ]] || [[ "$2" == --* ]]; then
+                echo "❌ Error: --base-branch requires a branch name"
+                show_help
+                exit 1
+            fi
+            BASE_BRANCH_OVERRIDE="$2"
             shift 2
             ;;
         --help|-h)
@@ -145,6 +156,12 @@ done
 
 # Load configuration
 load_config
+
+# Apply CLI override for base branch
+if [[ -n "$BASE_BRANCH_OVERRIDE" ]]; then
+    CF_BASE_BRANCH="$BASE_BRANCH_OVERRIDE"
+    echo "🌱 Using base branch from CLI: $CF_BASE_BRANCH"
+fi
 
 # Apply config defaults and NAME parameter
 if [[ -n "$NAME" ]]; then
@@ -221,8 +238,132 @@ if [[ ! -x "./claude-flow" ]] && ! command -v claude-flow &> /dev/null; then
     exit 1
 fi
 
+# Update base branch from remote
+update_base_branch() {
+    local base_branch="$1"
+    local quiet_mode="${2:-false}"
+    
+    # Skip if no base branch specified
+    if [[ -z "$base_branch" ]]; then
+        return 0
+    fi
+    
+    [[ "$quiet_mode" != "true" ]] && echo "🔄 Updating base branch: $base_branch"
+    
+    # Validate branch exists locally
+    if ! git show-ref --verify --quiet "refs/heads/$base_branch"; then
+        echo "❌ Error: Base branch '$base_branch' does not exist locally"
+        echo "💡 Available branches:"
+        git branch --format='  %(refname:short)' | head -10
+        local branch_count=$(git branch --format='%(refname:short)' | wc -l)
+        if [[ $branch_count -gt 10 ]]; then
+            echo "  ... and $((branch_count - 10)) more"
+        fi
+        return 1
+    fi
+    
+    # Perform fetch operation
+    [[ "$quiet_mode" != "true" ]] && echo "📥 Fetching latest changes from remote..."
+    if ! git fetch --quiet --all 2>/dev/null; then
+        echo "⚠️  Warning: Failed to fetch from remote"
+        echo "   Continuing with local version of $base_branch"
+        return 0
+    fi
+    
+    # Check for remote tracking
+    local remote_ref=$(git rev-parse --abbrev-ref "$base_branch@{upstream}" 2>/dev/null)
+    
+    if [[ -z "$remote_ref" ]]; then
+        [[ "$quiet_mode" != "true" ]] && echo "ℹ️  No remote tracking for $base_branch, using local version"
+        return 0
+    fi
+    
+    # Compare commits
+    local local_commit=$(git rev-parse "$base_branch" 2>/dev/null)
+    local remote_commit=$(git rev-parse "$remote_ref" 2>/dev/null)
+    
+    if [[ "$local_commit" == "$remote_commit" ]]; then
+        [[ "$quiet_mode" != "true" ]] && echo "✅ $base_branch is already up-to-date"
+        return 0
+    fi
+    
+    # Check if fast-forward is possible
+    if git merge-base --is-ancestor "$local_commit" "$remote_commit" 2>/dev/null; then
+        # Save current branch/commit
+        local current_ref=$(git symbolic-ref HEAD 2>/dev/null || git rev-parse HEAD)
+        
+        [[ "$quiet_mode" != "true" ]] && echo "🔄 Updating $base_branch from $remote_ref..."
+        
+        # Perform update
+        if git checkout "$base_branch" --quiet 2>/dev/null && \
+           git merge --ff-only "$remote_ref" --quiet 2>/dev/null; then
+            [[ "$quiet_mode" != "true" ]] && echo "✅ Successfully updated $base_branch"
+            
+            # Return to original ref
+            if [[ "$current_ref" == refs/heads/* ]]; then
+                git checkout "${current_ref#refs/heads/}" --quiet 2>/dev/null
+            else
+                git checkout "$current_ref" --quiet 2>/dev/null
+            fi
+        else
+            echo "⚠️  Warning: Failed to update $base_branch"
+            echo "   Continuing with local version"
+            # Try to return to original ref
+            if [[ "$current_ref" == refs/heads/* ]]; then
+                git checkout "${current_ref#refs/heads/}" --quiet 2>/dev/null
+            else
+                git checkout "$current_ref" --quiet 2>/dev/null
+            fi
+        fi
+    else
+        echo "⚠️  Warning: $base_branch has diverged from $remote_ref"
+        echo "   Using local version. Manual merge may be required."
+    fi
+    
+    return 0
+}
+
+# Validate base branch configuration
+validate_base_branch() {
+    local base_branch="$1"
+    
+    if [[ -z "$base_branch" ]]; then
+        return 0
+    fi
+    
+    # Check for common misconfigurations
+    if [[ "$base_branch" == "origin/"* ]]; then
+        echo "⚠️  Warning: Base branch includes 'origin/' prefix"
+        echo "   Attempting to use local branch: ${base_branch#origin/}"
+        CF_BASE_BRANCH="${base_branch#origin/}"
+        return 0
+    fi
+    
+    # Check for invalid characters
+    if [[ ! "$base_branch" =~ ^[a-zA-Z0-9/_.-]+$ ]]; then
+        echo "❌ Error: Invalid branch name: $base_branch"
+        echo "💡 Branch names should only contain alphanumeric characters, /, _, ., and -"
+        return 1
+    fi
+    
+    return 0
+}
+
 # Create git worktree and branch if requested
 if [[ -n "$WORKTREE_NAME" ]]; then
+    # Validate and update base branch if specified
+    if [[ -n "$CF_BASE_BRANCH" ]]; then
+        if ! validate_base_branch "$CF_BASE_BRANCH"; then
+            echo "💡 Tip: You can use --base-branch to specify a different base branch"
+            exit 1
+        fi
+        
+        if ! update_base_branch "$CF_BASE_BRANCH"; then
+            echo "💡 Tip: Check your base branch configuration or use --base-branch to override"
+            exit 1
+        fi
+    fi
+    
     WORKTREE_DIR_NAME="${WORKTREE_NAME}"
     WORKTREE_PATH="$ROOT_DIR/$CF_WORKTREE_DIR/$WORKTREE_DIR_NAME"
     
@@ -248,8 +389,8 @@ if [[ -n "$WORKTREE_NAME" ]]; then
             mkdir -p "$CF_WORKTREE_DIR"
             if [[ -n "$CF_BASE_BRANCH" ]]; then
                 if ! git worktree add "$WORKTREE_PATH" -b "$BRANCH_NAME" "$CF_BASE_BRANCH"; then
-                    echo "❌ Error: Failed to create worktree and branch"
-                    echo "💡 Check if the branch name is valid, base branch exists, and worktree path is available"
+                    echo "❌ Error: Failed to create worktree from base branch: $CF_BASE_BRANCH"
+                    echo "💡 Verify the base branch exists and is valid"
                     exit 1
                 fi
             else
